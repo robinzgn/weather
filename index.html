@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#16233c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>今日天气</title>
+<style>
+  :root{
+    --ink:#f3f7ff;
+    --ink-dim:rgba(243,247,255,.62);
+    --card:rgba(255,255,255,.10);
+    --stroke:rgba(255,255,255,.16);
+    --accent:#ffd479;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,"PingFang SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--ink);
+    background:#16233c;
+    display:flex;align-items:center;justify-content:center;
+    padding:calc(env(safe-area-inset-top) + 14px) 14px calc(env(safe-area-inset-bottom) + 14px);
+    overflow-x:hidden;overflow-y:auto;
+    transition:background .7s ease;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(120% 60% at 80% -10%, rgba(255,255,255,.22), transparent 60%),
+      radial-gradient(90% 50% at 10% 110%, rgba(0,0,0,.30), transparent 65%);
+  }
+  body.w-clear{background:linear-gradient(165deg,#2e64b5 0%,#4a8dd8 50%,#9dc8ea 100%)}
+  body.w-clear-night{background:linear-gradient(165deg,#0d1730 0%,#1b2b4d 55%,#2d4270 100%)}
+  body.w-cloudy{background:linear-gradient(165deg,#3a4a66 0%,#5b6d8b 55%,#93a1b6 100%)}
+  body.w-cloudy-night{background:linear-gradient(165deg,#131b2c 0%,#26324a 55%,#3c4a66 100%)}
+  body.w-rain{background:linear-gradient(165deg,#1b2d3f 0%,#2c4760 55%,#4e6d86 100%)}
+  body.w-snow{background:linear-gradient(165deg,#3c5068 0%,#6b849e 55%,#cbd9e6 100%)}
+  body.w-storm{background:linear-gradient(165deg,#141827 0%,#282c44 55%,#41465e 100%)}
+
+  .card{
+    position:relative;z-index:1;
+    width:100%;max-width:400px;
+    background:var(--card);
+    border:1px solid var(--stroke);
+    border-radius:26px;
+    padding:20px 20px 16px;
+    backdrop-filter:blur(18px) saturate(1.2);
+    -webkit-backdrop-filter:blur(18px) saturate(1.2);
+    box-shadow:0 20px 50px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.14);
+    animation:rise .5s cubic-bezier(.2,.7,.3,1) both;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  .bar{display:flex;align-items:center;gap:8px;min-height:24px}
+  .pin{font-size:13px;opacity:.55;line-height:1}
+  .city{font-size:16px;font-weight:600;letter-spacing:.2px;flex:1;
+        white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .refresh{
+    width:32px;height:32px;flex:0 0 32px;border:0;border-radius:50%;
+    background:rgba(255,255,255,.10);color:var(--ink);
+    display:grid;place-items:center;cursor:pointer;
+    transition:transform .35s ease, background .2s ease;
+  }
+  .refresh:active{background:rgba(255,255,255,.22)}
+  .refresh.spin{animation:rot .9s linear infinite}
+  @keyframes rot{to{transform:rotate(360deg)}}
+  .refresh svg{width:16px;height:16px;display:block}
+
+  .hero{display:flex;align-items:center;gap:6px;margin:14px 0 2px}
+  .icon{font-size:64px;line-height:1;filter:drop-shadow(0 6px 14px rgba(0,0,0,.28));
+        animation:bob 4.5s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  .temp{font-size:70px;font-weight:200;letter-spacing:-3px;line-height:.95;
+        font-variant-numeric:tabular-nums}
+  .temp sup{font-size:26px;font-weight:300;letter-spacing:0;vertical-align:super;opacity:.85}
+  .sub{display:flex;align-items:baseline;gap:10px;font-size:14px;color:var(--ink-dim);
+       margin-top:2px;padding-left:2px}
+  .sub .desc{color:var(--ink);opacity:.92;font-size:15px}
+
+  .tip{
+    margin-top:18px;padding:13px 15px;
+    background:linear-gradient(100deg,rgba(255,212,121,.16),rgba(255,212,121,.05));
+    border-left:3px solid var(--accent);border-radius:12px;
+    font-size:14.5px;line-height:1.6;
+  }
+  .tip .hd{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+           letter-spacing:1.5px;color:var(--accent);opacity:.95;margin-bottom:5px}
+  .tip .bd{opacity:.96}
+
+  .meta{display:flex;gap:8px;margin-top:14px}
+  .pill{
+    flex:1;text-align:center;padding:10px 4px 9px;
+    background:rgba(0,0,0,.18);border-radius:14px;
+    font-size:11px;color:var(--ink-dim);letter-spacing:.4px;
+  }
+  .pill b{display:block;font-size:15px;font-weight:600;color:var(--ink);
+          margin-top:4px;letter-spacing:0;font-variant-numeric:tabular-nums}
+
+  .foot{margin-top:13px;padding-top:11px;border-top:1px solid rgba(255,255,255,.10);
+        display:flex;align-items:center;justify-content:space-between;
+        font-size:10.5px;color:rgba(243,247,255,.40)}
+  .badge{color:var(--accent);opacity:.85}
+
+  .state{padding:6px 2px 2px}
+  .sk{border-radius:10px;background:linear-gradient(90deg,rgba(255,255,255,.08) 25%,rgba(255,255,255,.18) 37%,rgba(255,255,255,.08) 63%);
+      background-size:400% 100%;animation:sh 1.3s ease-in-out infinite}
+  @keyframes sh{0%{background-position:100% 0}100%{background-position:0 0}}
+  .sk.t{height:64px;width:58%;margin:12px 0 10px}
+  .sk.l{height:14px;width:80%;margin-bottom:9px}
+  .sk.l2{height:14px;width:56%}
+  .sk.box{height:58px;width:100%;margin-top:16px;border-radius:12px}
+
+  .msg{text-align:center;padding:26px 6px}
+  .msg .em{font-size:34px;line-height:1;margin-bottom:10px;opacity:.9}
+  .msg .t{font-size:14.5px;margin-bottom:4px}
+  .msg .s{font-size:12px;color:var(--ink-dim);line-height:1.6;word-break:break-word}
+  .btn{
+    margin-top:16px;padding:10px 26px;border:1px solid rgba(255,255,255,.28);
+    border-radius:99px;background:rgba(255,255,255,.10);color:var(--ink);
+    font-size:13.5px;font-family:inherit;cursor:pointer;transition:background .2s;
+  }
+  .btn:active{background:rgba(255,255,255,.24)}
+  .hide{display:none!important}
+  @media (max-height:620px){
+    .icon{font-size:48px}.temp{font-size:56px}.tip{margin-top:12px}
+    body{align-items:flex-start;padding-top:calc(env(safe-area-inset-top) + 10px)}
+  }
+</style>
+</head>
+<body class="w-clear-night">
+<div class="card">
+
+  <div class="bar hide" id="bar">
+    <span class="pin">📍</span>
+    <span class="city" id="city">定位中</span>
+    <button class="refresh" id="refresh" aria-label="刷新">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="state" id="loading">
+    <div class="sk t"></div>
+    <div class="sk l"></div>
+    <div class="sk l2"></div>
+    <div class="sk box"></div>
+    <div class="foot" style="border:0;justify-content:center">
+      <span id="phase">正在定位…</span>
+    </div>
+  </div>
+
+  <div class="state hide" id="error">
+    <div class="msg">
+      <div class="em" id="err-em">🌧️</div>
+      <div class="t" id="err-t">没能拿到天气</div>
+      <div class="s" id="err-s"></div>
+      <button class="btn" id="retry">重试</button>
+    </div>
+  </div>
+
+  <div class="hide" id="content">
+    <div class="hero">
+      <div class="icon" id="icon">🌤️</div>
+      <div>
+        <div class="temp" id="temp">--<sup>°</sup></div>
+      </div>
+    </div>
+    <div class="sub">
+      <span class="desc" id="desc">—</span>
+      <span id="range">—</span>
+    </div>
+
+    <div class="tip">
+      <div class="hd">穿衣提醒</div>
+      <div class="bd" id="tip">—</div>
+    </div>
+
+    <div class="meta">
+      <div class="pill">体感<b id="feels">—</b></div>
+      <div class="pill">湿度<b id="humidity">—</b></div>
+      <div class="pill">风速<b id="wind">—</b></div>
+    </div>
+
+    <div class="foot">
+      <span id="updated">—</span>
+      <span class="badge" id="badge"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var CACHE_KEY = 'wx-cache-v2';
+  var DEFAULT = { lat: 31.2304, lon: 121.4737, name: '上海' };
+  var STALE_MS = 10 * 60 * 1000;
+
+  var CODES = {
+    0:['☀️','晴','clear'], 1:['🌤️','大致晴朗','clear'],
+    2:['⛅','局部多云','cloudy'], 3:['☁️','阴','cloudy'],
+    45:['🌫️','有雾','cloudy'], 48:['🌫️','雾凇','cloudy'],
+    51:['🌦️','小毛毛雨','rain'], 53:['🌦️','毛毛雨','rain'], 55:['🌧️','浓毛毛雨','rain'],
+    56:['🌧️','冻毛毛雨','rain'], 57:['🌧️','浓冻毛毛雨','rain'],
+    61:['🌦️','小雨','rain'], 63:['🌧️','中雨','rain'], 65:['🌧️','大雨','rain'],
+    66:['🌧️','冻雨','rain'], 67:['🌧️','强冻雨','rain'],
+    71:['🌨️','小雪','snow'], 73:['🌨️','中雪','snow'], 75:['❄️','大雪','snow'],
+    77:['❄️','雪粒','snow'],
+    80:['🌦️','阵雨','rain'], 81:['🌧️','强阵雨','rain'], 82:['⛈️','暴雨','storm'],
+    85:['🌨️','阵雪','snow'], 86:['❄️','强阵雪','snow'],
+    95:['⛈️','雷阵雨','storm'], 96:['⛈️','雷阵雨伴冰雹','storm'],
+    99:['⛈️','强雷暴伴冰雹','storm']
+  };
+  function codeInfo(c) { return CODES[c] || ['🌡️','天气未知','cloudy']; }
+
+  function clothingTip(t, code, wind, pp, uv) {
+    var s, lut = [
+      [33,'酷热，穿最轻薄透气的短袖短裤，尽量待在阴凉处。'],
+      [28,'偏热，短袖短裤或薄裙就够，记得补水和防晒。'],
+      [24,'温暖，短袖单件正合适，早晚可搭件薄外套。'],
+      [19,'舒适，长袖衬衫或薄卫衣，配条长裤刚好。'],
+      [14,'微凉，穿件夹克或针织衫，里面配长袖。'],
+      [9, '凉，外套加毛衣或厚卫衣，别只穿单层。'],
+      [4, '冷，需要厚外套或棉服，围巾可以戴上了。'],
+      [-3,'很冷，羽绒服加毛衣，帽子和手套一并带上。'],
+      [-99,'严寒，羽绒服配保暖内层，露在外面的皮肤越少越好。']
+    ];
+    for (var i = 0; i < lut.length; i++) { if (t >= lut[i][0]) { s = lut[i][1]; break; } }
+
+    var extra = [];
+    var rainy = (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95 || pp >= 50;
+    var snowy = (code >= 71 && code <= 77) || code === 85 || code === 86;
+    if (rainy) extra.push('记得带伞');
+    if (snowy) extra.push('穿防滑保暖的鞋');
+    if (wind >= 9) extra.push('风大，外套选防风的');
+    if (t >= 24 && uv >= 6) extra.push('紫外线强，做好防晒');
+    if (extra.length) s += extra.join('，') + '。';
+    return s;
+  }
+
+  var WK = ['周日','周一','周二','周三','周四','周五','周六'];
+  function fmtDate(d) { return (d.getMonth()+1) + '月' + d.getDate() + '日 ' + WK[d.getDay()]; }
+  function ago(ms) {
+    var m = Math.floor((Date.now() - ms) / 60000);
+    if (m < 1) return '刚刚更新';
+    if (m < 60) return m + ' 分钟前更新';
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + ' 小时前更新';
+    return Math.floor(h / 24) + ' 天前更新';
+  }
+
+  function view(which) {
+    ['loading','error','content'].forEach(function (k) {
+      $(k).classList.toggle('hide', k !== which);
+    });
+    $('bar').classList.toggle('hide', which !== 'content');
+  }
+
+  function error(kind, detail) {
+    var e = {
+      geo: ['📍','定位失败','浏览器没给位置权限，也没能通过 IP 确定城市。允许定位后再重试。'],
+      net: ['📡','网络不通','没能连上天气服务，检查一下网络再重试。'],
+      api: ['🛠️','天气服务异常','接口返回了异常数据，稍后重试看看。']
+    }[kind] || ['🌧️','没能拿到天气',''];
+    $('err-em').textContent = e[0];
+    $('err-t').textContent = e[1];
+    $('err-s').textContent = detail ? (e[2] + '（' + detail + '）') : e[2];
+    view('error');
+  }
+
+  function saveCache(obj) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(obj)); } catch (e) {}
+  }
+  function readCache() {
+    try {
+      var s = localStorage.getItem(CACHE_KEY);
+      if (!s) return null;
+      var o = JSON.parse(s);
+      return (o && o.ts && o.w) ? o : null;
+    } catch (e) { return null; }
+  }
+
+  function getLocation() {
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      var timer = setTimeout(function () { if (!settled) { settled = true; ipLocate(resolve, reject); } }, 5200);
+      if (!navigator.geolocation) { clearTimeout(timer); ipLocate(resolve, reject); return; }
+      navigator.geolocation.getCurrentPosition(
+        function (p) {
+          if (settled) return;
+          settled = true; clearTimeout(timer);
+          resolve({ lat: p.coords.latitude, lon: p.coords.longitude, name: '' });
+        },
+        function () {
+          if (settled) return;
+          settled = true; clearTimeout(timer);
+          ipLocate(resolve, reject);
+        },
+        { enableHighAccuracy: false, timeout: 4800, maximumAge: 900000 }
+      );
+    });
+  }
+
+  var IP_URLS = ['https://ipwho.is/', 'https://ipapi.co/json/', 'https://ipinfo.io/json'];
+  function pickIp(d) {
+    if (d && typeof d.latitude === 'number' && isFinite(d.latitude)) {
+      return { lat: d.latitude, lon: d.longitude, name: d.city || d.region || '' };
+    }
+    if (d && typeof d.loc === 'string') {
+      var p = d.loc.split(',');
+      if (p.length === 2) {
+        var la = parseFloat(p[0]), lo = parseFloat(p[1]);
+        if (isFinite(la) && isFinite(lo)) return { lat: la, lon: lo, name: d.city || d.region || '' };
+      }
+    }
+    return null;
+  }
+  function ipLocate(resolve, reject) {
+    var i = 0;
+    (function next() {
+      if (i >= IP_URLS.length) { reject({ kind: 'geo' }); return; }
+      fetch(IP_URLS[i++], { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+        .then(function (d) { var v = pickIp(d); if (v) resolve(v); else next(); })
+        .catch(next);
+    })();
+  }
+
+  function resolveName(lat, lon, fallback) {
+    return fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat +
+                 '&longitude=' + lon + '&localityLanguage=zh', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) return fallback || '当前位置';
+        return d.city || d.locality || d.principalSubdivision || fallback || '当前位置';
+      })
+      .catch(function () { return fallback || '当前位置'; });
+  }
+
+  function render(w, cityName, ts) {
+    var info = codeInfo(w.code);
+    var night = w.isDay === 0;
+    var cls = 'w-' + info[2] + ((info[2] === 'clear' || info[2] === 'cloudy') && night ? '-night' : '');
+    document.body.className = cls;
+    document.querySelector('meta[name=theme-color]')
+      .setAttribute('content', night ? '#0d1730' : '#2e64b5');
+
+    $('city').textContent = cityName || '当前位置';
+    $('icon').textContent = info[0];
+    $('temp').innerHTML = Math.round(w.temp) + '<sup>°</sup>';
+    $('desc').textContent = info[1] + (night ? ' · 夜间' : '');
+    $('range').textContent = (w.hi != null && w.lo != null) ? ('高 ' + w.hi + '° / 低 ' + w.lo + '°') : '';
+    $('tip').textContent = clothingTip(w.feels, w.code, w.wind, w.pp, w.uv);
+    $('feels').textContent = Math.round(w.feels) + '°';
+    $('humidity').textContent = (w.hum != null ? Math.round(w.hum) + '%' : '—');
+    $('wind').textContent = (Math.round(w.wind * 10) / 10) + ' m/s';
+    $('updated').textContent = ago(ts);
+    $('badge').textContent = (Date.now() - ts > STALE_MS) ? '数据较旧' : '';
+    view('content');
+  }
+
+  var busy = false;
+  function load(isRetry) {
+    if (busy) return;
+    busy = true;
+    $('refresh').classList.add('spin');
+    if (!isRetry) { $('phase').textContent = '正在定位…'; view('loading'); }
+
+    getLocation()
+      .then(function (loc) {
+        $('phase').textContent = '正在获取天气…';
+        var url = 'https://api.open-meteo.com/v1/forecast' +
+          '?latitude=' + loc.lat + '&longitude=' + loc.lon +
+          '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day' +
+          '&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max,uv_index_max' +
+          '&timezone=auto&forecast_days=1';
+        return fetch(url, { cache: 'no-store' })
+          .then(function (r) { if (!r.ok) throw { kind: 'api', d: 'HTTP ' + r.status }; return r.json(); })
+          .catch(function (e) { throw (e && e.kind ? e : { kind: 'net' }); })
+          .then(function (d) {
+            if (!d || !d.current) throw { kind: 'api', d: '字段缺失' };
+            var cur = d.current, day = d.daily || {};
+            var g = function (a, i, fb) { return (a && a[i] != null) ? a[i] : fb; };
+            var W = {
+              temp: cur.temperature_2m,
+              feels: cur.apparent_temperature != null ? cur.apparent_temperature : cur.temperature_2m,
+              hum: cur.relative_humidity_2m,
+              wind: cur.wind_speed_10m || 0,
+              code: cur.weather_code != null ? cur.weather_code : g(day.weather_code, 0, 0),
+              isDay: cur.is_day != null ? cur.is_day : 1,
+              hi: g(day.temperature_2m_max, 0, null),
+              lo: g(day.temperature_2m_min, 0, null),
+              pp: g(day.precipitation_probability_max, 0, 0),
+              uv: g(day.uv_index_max, 0, 0)
+            };
+            W.hi = W.hi != null ? Math.round(W.hi) : null;
+            W.lo = W.lo != null ? Math.round(W.lo) : null;
+            return resolveName(loc.lat, loc.lon, loc.name).then(function (nm) {
+              return { w: W, city: nm, ts: Date.now() };
+            });
+          });
+      })
+      .then(function (res) {
+        saveCache(res);
+        render(res.w, res.city, res.ts);
+      })
+      .catch(function (e) {
+        var cached = readCache();
+        if (cached) {
+          render(cached.w, cached.city, cached.ts);
+          $('badge').textContent = '离线缓存';
+        } else {
+          error((e && e.kind) || 'net', e && e.d);
+        }
+      })
+      .then(function () {
+        busy = false;
+        $('refresh').classList.remove('spin');
+      });
+  }
+
+  $('refresh').addEventListener('click', function () { load(true); });
+  $('retry').addEventListener('click', function () { load(true); });
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) return;
+    var c = readCache();
+    if (!c || Date.now() - c.ts > STALE_MS) load(true);
+    else if ($('content').classList.contains('hide')) render(c.w, c.city, c.ts);
+  });
+
+  var boot = readCache();
+  if (boot) {
+    render(boot.w, boot.city, boot.ts);
+    $('badge').textContent = '离线缓存';
+    if (Date.now() - boot.ts > STALE_MS) load(true);
+  } else {
+    load();
+  }
+})();
+</script>
+</body>
+</html>
